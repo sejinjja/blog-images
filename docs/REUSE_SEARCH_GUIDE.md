@@ -1,54 +1,81 @@
 # Reuse Search Guide
 
-## 목적
-- 특정 이미지를 가장 적은 비용으로 찾아 재사용한다.
-- 외부 API 없이 저장소의 기존 메타데이터만 사용한다.
-- 결과는 최소 2개, 기본 3개 후보를 제공한다.
+## Purpose
+- Find reusable images with semantic relevance and low token cost.
+- Use only local static metadata.
+- Avoid forced or low-confidence matches.
 
-## 금지사항
-- 비전 API, 임베딩 API, 외부 검색 API 사용 금지
-- 서버 실행 금지
-- 자동화 스크립트 운영 금지
-
-## 입력 유형
+## Inputs
 - `raw_url`
-- `path` 또는 파일명
-- 텍스트 설명(한글/영문)
+- `path` or filename
+- Korean or English semantic query
 
-## 탐색 순서 (비용 최소 우선)
-1. 정확 일치 탐색
-- `raw_url` 또는 `path`가 정확히 일치하는 레코드를 먼저 찾는다.
+## Metadata Dependency
+- Source files:
+- `metadata/image_tags.jsonl`
+- `metadata/query_alias.json`
+- Expected format: `grouped-sem-v1`
+- `raw_url` derivation: `cfg.b + path`
 
-2. 태그/캡션 유사 탐색
-- `caption_ko`, `caption_en`, `tags_ko`, `tags_en`, `subject`, `style`, `scene`를 기준으로 유사 후보를 찾는다.
-- 텍스트 일치 근거를 명시한다.
+## Query Normalization (Bilingual)
+Normalize query words to semantic code sets before scoring.
 
-3. 후보 부족 시 수동 확장 1회
-- 동의어/유사 표현으로 검색을 1회 확장한다.
-- 그래도 후보가 부족하면 부족 사유를 보고한다.
+Order:
+1. lowercase + trim + punctuation cleanup
+2. phrase-first (`2-gram`) alias lookup
+3. unigram alias lookup
+4. build `Q.t`, `Q.o`, `Q.n`
 
-## 출력 계약
-- 최소 2개, 기본 3개 후보
-- 각 후보는 아래 3개 필드를 반드시 포함
+Examples:
+- Korean:
+- `요리` -> `Q.t += food`
+- `빵 요리` -> `Q.o += bread`, `Q.t += food`
+- `정장 인물` -> `Q.o += suit/person`
+- English:
+- `cooking` -> `Q.t += food`
+- `bread cooking` -> `Q.o += bread`, `Q.t += food`
+- `fashion portrait` -> `Q.t += fashion`, `Q.n += portrait_editorial`
+
+## Search Order
+1. Exact path/url match
+- If input is `raw_url`, strip base prefix and match path in group `p`.
+- If input is `path` or filename, exact-match path in group `p`.
+
+2. Semantic overlap gate
+- If all of `Q.t`, `Q.o`, `Q.n` are empty -> `mode=no_match` (`unmapped_query_terms`).
+- If `Q.o` is non-empty, group must overlap in `s.o`.
+- If `Q.t` is non-empty, group must overlap in `s.t`.
+- `Q.n` is optional boost only.
+
+3. Scoring
+- `score = 3 * |Q.o ∩ G.o| + 2 * |Q.t ∩ G.t| + 1 * |Q.n ∩ G.n|`
+- Rank by `score desc`, then `group_id asc`, then `path asc`.
+
+4. Diversity filter
+- Select at most one path from each group in the first pass.
+- Exclude exact binary duplicates in the same response.
+
+5. Result shaping
+- If qualified unique candidates >= 2: `mode=match`, return 2 to 3.
+- If qualified unique candidates < 2: `mode=no_match`.
+
+## Output Contract
+### `match` mode
+- `query`
+- `mode`: `match`
+- `result_count`: `2` to `3`
+- `results[]`:
 - `raw_url`
 - `match_reason`
 - `confidence_note`
 
-## 출력 템플릿
-```text
-query: <사용자 질의>
-result_count: <N>
+### `no_match` mode
+- `query`
+- `mode`: `no_match`
+- `result_count`: `0`
+- `no_match_reason`
 
-1) raw_url: <url>
-   match_reason: <매칭 근거>
-   confidence_note: <신뢰도/주의사항>
-
-2) raw_url: <url>
-   match_reason: <매칭 근거>
-   confidence_note: <신뢰도/주의사항>
-```
-
-## 운영 기준
-- 결과가 2개 미만이면 그 이유를 명확히 기록한다.
-- 후보 제시 시 중복 URL을 제거한다.
-- 신규 생성 관여는 하지 않고 재사용 탐색에만 집중한다.
+## Restrictions
+- No external APIs.
+- No server execution.
+- No automation-script dependency for daily operations.

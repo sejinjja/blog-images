@@ -39,4 +39,6 @@ python optimize_pngs.py posts --write --colors 256 --min-reduction-bytes 1024
 - Tagging guide: `docs/TAGGING_GUIDE.md`
 - Reuse search guide: `docs/REUSE_SEARCH_GUIDE.md`
 - No-API policy: `docs/NO_API_POLICY.md`
+- Compact metadata index: `metadata/image_tags.jsonl` (`grouped-sem-v1`)
+- Bilingual query alias map: `metadata/query_alias.json` (`sem-alias-v1`)
 - Review log: `metadata/review_samples.md`

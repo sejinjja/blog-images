@@ -1,50 +1,88 @@
-# Daily Operation Rule (Single Control File)
+# Daily Rule (Single Control File)
 
-## 목표
-- 이 저장소의 이미지를 재사용 관점으로 관리한다.
-- 사용자는 매일 동일한 문구로 지시한다.
-- 결과 보고 형식을 항상 동일하게 유지한다.
-
-## 고정 지시 문구
+## Fixed Instruction
 `tasks/rule.md를 보고 작업을 진행해주세요.`
 
-## 범위
-포함:
-- 기존 이미지 재사용 탐색
-- 태깅 데이터(`metadata/image_tags.jsonl`) 유지 및 보완
-- 태깅/재사용 가이드 문서 유지
+## Goal
+- Operate this repository for image reuse only.
+- Use semantic words only (topic/object/intent).
+- Keep token cost low with codebook-based metadata.
 
-제외:
-- 신규 이미지 생성 관여
-- 외부 API 호출
-- 서버 실행
-- 자동화 스크립트 운영
+## Scope
+Included:
+- Reuse search on existing images
+- Semantic metadata maintenance in `metadata/image_tags.jsonl`
+- Query alias maintenance in `metadata/query_alias.json`
+- Guide maintenance in `docs/`
 
-## 작업목록
-1. 사용자 요청과 이 문서를 함께 확인한다.
-2. `docs/TAGGING_GUIDE.md`와 `docs/REUSE_SEARCH_GUIDE.md` 규칙을 우선 적용한다.
-3. 재사용 탐색 요청이면 기존 데이터에서 후보를 찾고 근거를 제시한다.
-4. 태깅 요청이면 계약 키를 지키며 레코드를 갱신한다.
-5. 완료 시 보고 형식 계약으로 결과를 전달한다.
+Excluded:
+- New image generation
+- Any external API usage
+- Any server execution
+- Automation-script dependency for daily operations
 
-## 완료조건
-- 완료 보고는 항상 다음 순서를 따른다.
-- `요약`
-- `변경파일`
-- `검증결과`
+## Required Report Format
+1. Summary
+2. Changed files
+3. Verification results
 
-재사용 탐색 요청이 포함될 때:
-- 유사 후보 최소 2개, 기본 3개를 제시한다.
-- 각 후보에 `raw_url`, `match_reason`, `confidence_note`를 포함한다.
+## Metadata Format Policy
+- File: `metadata/image_tags.jsonl`
+- Format: `grouped-sem-v1`
+- Config keys: `_`, `f`, `b`, `tv`, `ts`, `qp`, `nm`, `tm`, `om`, `im`
+- Group keys: `i`, `p`, `s`
+- Semantic code object in `s`: `t`, `o`, `n`
+- `raw_url` is derived at read time: `cfg.b + path`
 
-태깅 데이터를 수정할 때:
-- 필수 키 누락 0건
-- `path` 중복 0건
+## Query Alias Policy
+- File: `metadata/query_alias.json`
+- Version key: `v = sem-alias-v1`
+- Buckets: `t`, `o`, `n`
+- Query mapping order:
+1. phrase-first (`2-gram`)
+2. unigram
 
-## 운영정책
-- API 사용 금지: 비전, 임베딩, 외부 검색 API 포함
-- 서버 실행 금지: 로컬/원격 서버 모두 금지
-- 자동화 스크립트 운영 금지: 일상 운영은 문서+수동 절차만 허용
-- 비용 최소화 우선: 정확 일치(path/url) -> 태그/캡션 매칭 -> 수동 확장 1회
-- 모호한 요청 처리: 보수적으로 해석하고 결과를 바꿀 핵심 질문만 1회 수행
-- 정책 상세 문서: `docs/NO_API_POLICY.md`
+## Reuse Search Contract
+- Two modes are allowed:
+1. `match`: return 2 to 3 candidates
+2. `no_match`: return 0 candidates with explicit reason
+
+- Candidate fields:
+- `raw_url`
+- `match_reason`
+- `confidence_note`
+
+- No-match fields:
+- `query`
+- `mode` = `no_match`
+- `result_count` = `0`
+- `no_match_reason`
+
+## Result Diversity Rule
+- Do not return duplicate images in one response.
+- Selection order for diversity:
+1. one path per group first
+2. then fill remaining slots from next-ranked groups
+- If identical binary duplicates are detected, keep only one canonical path in the same response.
+
+## Scoring and Gate Rules
+- Normalize query to code sets `Q.t`, `Q.o`, `Q.n`.
+- Hard gate:
+- if all sets are empty -> `no_match` (`unmapped_query_terms`)
+- if `Q.o` is non-empty, group must overlap in `s.o`
+- if `Q.t` is non-empty, group must overlap in `s.t`
+- `Q.n` is optional boost
+- Score:
+- `3 * |Q.o ∩ G.o| + 2 * |Q.t ∩ G.t| + 1 * |Q.n ∩ G.n|`
+- Sort:
+- score desc, then `group_id` asc, then `path` asc
+
+## Hard Restrictions
+- No external APIs (vision/embedding/search APIs included).
+- No local/remote server execution.
+- No automation-script dependency for daily operations.
+
+## Reference Docs
+- `docs/NO_API_POLICY.md`
+- `docs/TAGGING_GUIDE.md`
+- `docs/REUSE_SEARCH_GUIDE.md`
