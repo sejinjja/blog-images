@@ -1,1 +1,34 @@
 # blog-images
+
+This repository stores blog PNG images.
+
+It now includes `optimize_pngs.py` for safe in-place PNG optimization for web use.
+
+## Requirements covered
+
+- Keep file names and `.png` extension unchanged.
+- No new `originals` folder.
+- Safe to run multiple times without cumulative lossy degradation.
+
+## Usage
+
+1. Dry-run (no file changes):
+```bash
+python optimize_pngs.py posts
+```
+
+2. Apply in place:
+```bash
+python optimize_pngs.py posts --write
+```
+
+3. Custom options:
+```bash
+python optimize_pngs.py posts --write --colors 256 --min-reduction-bytes 1024
+```
+
+## Safety rules
+
+- Palette PNG (`mode=P`) is never re-quantized with lossy conversion.
+- Files are written to a temp file first, then atomically replaced with `os.replace`.
+- `.png-opt-manifest.json` skips unchanged files on repeated runs.
