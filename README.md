@@ -32,3 +32,11 @@ python optimize_pngs.py posts --write --colors 256 --min-reduction-bytes 1024
 - Palette PNG (`mode=P`) is never re-quantized with lossy conversion.
 - Files are written to a temp file first, then atomically replaced with `os.replace`.
 - `.png-opt-manifest.json` skips unchanged files on repeated runs.
+
+## Daily operation
+
+- Control file: `tasks/rule.md`
+- Tagging guide: `docs/TAGGING_GUIDE.md`
+- Reuse search guide: `docs/REUSE_SEARCH_GUIDE.md`
+- No-API policy: `docs/NO_API_POLICY.md`
+- Review log: `metadata/review_samples.md`
